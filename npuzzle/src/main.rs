@@ -4,9 +4,6 @@ use std::env;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 
-use std::cmp::Ordering;
-use Ordering::{Less, Equal, Greater};
-
 enum Heuristic
 {
 	Hamming,
