@@ -4,6 +4,9 @@ use std::env;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 
+use std::cmp::Ordering;
+use Ordering::{Less, Equal, Greater};
+
 enum Heuristic
 {
 	Hamming,
@@ -22,18 +25,36 @@ struct Node {
 }
 
 impl Node {
-	fn new(board: Vec<Vec<usize>>, heur: Heuristic, goal: &Vec<Vec<usize>>) {
-		g = 0;
-		f = match heur {
-			Hamming => self.hamming(g),
-			Manhattan => self.manhattan(g),
-			OutOfLine => self.outOfLine(g),
-			Nilsson => self.nilsson(g),
-		};
-		Node { f, g, heur, goal, board }
+	fn new(&self, board: Vec<Vec<usize>>, heur: Heuristic, goal: &Vec<Vec<usize>>) -> Node {
+		let mut out = Node { f: 0, g: 0, heur, goal, board };
+		match heur {
+			Hamming => out.hamming(),
+			Manhattan => out.manhattan(),
+			OutOfLine => out.outOfLine(),
+			Nilsson => out.nilsson(),
+		}
+		out.clone()
 	}
 
+	fn hamming(& mut self) {
+		h = 0;
+		self.f = g + h;
+	}
 
+	fn manhattan(& mut self) {
+		h = 0;
+		self.f = g + h;
+	}
+
+	fn outOfLine(& mut self) {
+		h = 0;
+		self.f = g + h;
+	}
+
+	fn nilsson(& mut self) {
+		h = 0;
+		self.f = g + h;
+	}
 }
 
 impl Ord for Node {
