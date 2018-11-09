@@ -4,6 +4,7 @@ use std::env;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 enum Heuristic
 {
 	Hamming,
@@ -13,61 +14,61 @@ enum Heuristic
 }
 
 #[derive(Clone, Hash, Eq)]
-struct Node {
+struct Node<'a> {
 	f: usize,
 	g: usize,
 	heur: Heuristic,
-	goal: &Vec<Vec<usize>>,
+	goal: &'a Vec<Vec<usize>>,
 	board: Vec<Vec<usize>>,
 }
 
-impl Node {
-	fn new(&self, board: Vec<Vec<usize>>, heur: Heuristic, goal: &Vec<Vec<usize>>) -> Node {
+impl<'a> Node<'a> {
+	fn new(board: Vec<Vec<usize>>, heur: Heuristic, goal: &'a Vec<Vec<usize>>) -> Node {
 		let mut out = Node { f: 0, g: 0, heur, goal, board };
-		match heur {
-			Hamming => out.hamming(),
-			Manhattan => out.manhattan(),
-			OutOfLine => out.outOfLine(),
-			Nilsson => out.nilsson(),
+		match &out.heur {
+			&Heuristic::Hamming => out.hamming(),
+			&Heuristic::Manhattan => out.manhattan(),
+			&Heuristic::OutOfLine => out.out_of_line(),
+			&Heuristic::Nilsson => out.nilsson(),
 		}
 		out.clone()
 	}
 
 	fn hamming(& mut self) {
-		h = 0;
-		self.f = g + h;
+		let mut h = 0;
+		self.f = self.g + h;
 	}
 
 	fn manhattan(& mut self) {
-		h = 0;
-		self.f = g + h;
+		let mut h = 0;
+		self.f = self.g + h;
 	}
 
-	fn outOfLine(& mut self) {
-		h = 0;
-		self.f = g + h;
+	fn out_of_line(& mut self) {
+		let mut h = 0;
+		self.f = self.g + h;
 	}
 
 	fn nilsson(& mut self) {
-		h = 0;
-		self.f = g + h;
+		let mut h = 0;
+		self.f = self.g + h;
 	}
 }
 
-impl Ord for Node {
+impl<'a> Ord for Node<'a> {
 	fn cmp(&self, other: &Node) -> std::cmp::Ordering {
 		self.f.cmp(&other.f)
 	}
 }
 
-impl PartialOrd for Node {
+impl<'a> PartialOrd for Node<'a> {
 	fn partial_cmp(&self, other: &Node) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 // ???? Maybe just make it normal
-impl PartialEq for Node {
+impl<'a> PartialEq for Node<'a> {
 	fn eq(&self, other: &Node) -> bool {
 		self.f == other.f
 	}
