@@ -2,6 +2,58 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::env;
 use std::collections::HashSet;
+use std::collections::BinaryHeap;
+
+enum Heuristic
+{
+	Hamming,
+	Manhattan,
+	OutOfLine,
+	Nilsson,
+}
+
+#[derive(Clone, Hash, Eq)]
+struct Node {
+	f: usize,
+	g: usize,
+	heur: Heuristic,
+	goal: &Vec<Vec<usize>>,
+	board: Vec<Vec<usize>>,
+}
+
+impl Node {
+	fn new(board: Vec<Vec<usize>>, heur: Heuristic, goal: &Vec<Vec<usize>>) {
+		g = 0;
+		f = match heur {
+			Hamming => self.hamming(g),
+			Manhattan => self.manhattan(g),
+			OutOfLine => self.outOfLine(g),
+			Nilsson => self.nilsson(g),
+		};
+		Node { f, g, heur, goal, board }
+	}
+
+
+}
+
+impl Ord for Node {
+	fn cmp(&self, other: &Node) -> std::cmp::Ordering {
+		self.f.cmp(&other.f)
+	}
+}
+
+impl PartialOrd for Node {
+	fn partial_cmp(&self, other: &Node) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+// ???? Maybe just make it normal
+impl PartialEq for Node {
+	fn eq(&self, other: &Node) -> bool {
+		self.f == other.f
+	}
+}
 
 fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 	let mut out = Vec::new();
@@ -43,7 +95,7 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 			return Err("invalid value");
 		}
 	}
-	return Ok(out);
+	Ok(out)
 }
 
 fn main() {
