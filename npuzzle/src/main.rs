@@ -4,6 +4,28 @@ use std::env;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 
+struct Quest {
+	goal: Vec<Vec<usize>>,
+	open: BinaryHeap<Node<'a>>,
+	closed: HashSet<Node<'a>>,
+	heur: Heuristic,
+	greedy: bool,
+}
+
+impl<'a> Quest<'a> {
+	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: Vec<Vec<usize>>) -> Quest {
+		let mut open = BinaryHeap::new();
+		open.push(board);
+		Quest {
+			goal,
+			open,
+			closed: HashSet::new(),
+			heur,
+			greedy,
+		}
+	}
+}
+
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 enum Heuristic
 {
@@ -17,41 +39,73 @@ enum Heuristic
 struct Node<'a> {
 	f: usize,
 	g: usize,
-	heur: Heuristic,
+	zero: (usize, usize),
 	goal: &'a Vec<Vec<usize>>,
 	board: Vec<Vec<usize>>,
 }
 
 impl<'a> Node<'a> {
-	fn new(board: Vec<Vec<usize>>, heur: Heuristic, goal: &'a Vec<Vec<usize>>) -> Node {
-		let mut out = Node { f: 0, g: 0, heur, goal, board };
-		match &out.heur {
-			&Heuristic::Hamming => out.hamming(),
-			&Heuristic::Manhattan => out.manhattan(),
-			&Heuristic::OutOfLine => out.out_of_line(),
-			&Heuristic::Nilsson => out.nilsson(),
+	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: &Vec<Vec<usize>>) -> Node {
+		let mut i = 0;
+		let zero = 'outer: loop {
+			for j in 0..(board.len()) {
+				if board[i][j] == 0 {
+					break 'outer (i, j);
+				}
+			}
+			i += 1;
+			if i == board.len() {
+				panic!();
+			}
+		};
+		let mut out = Node { f: 0, g: 0, zero, goal, board };
+		match heur {
+			Heuristic::Hamming => out.hamming(greedy),
+			Heuristic::Manhattan => out.manhattan(greedy),
+			Heuristic::OutOfLine => out.out_of_line(greedy),
+			Heuristic::Nilsson => out.nilsson(greedy),
 		}
-		out.clone()
+		out
 	}
 
-	fn hamming(& mut self) {
+	fn hamming(& mut self, greedy: bool) {
 		let mut h = 0;
-		self.f = self.g + h;
+		if greedy {
+			self.f = h;
+		}
+		else {
+			self.f = self.g + h;
+		}
 	}
 
-	fn manhattan(& mut self) {
+	fn manhattan(& mut self, greedy: bool) {
 		let mut h = 0;
-		self.f = self.g + h;
+		if greedy {
+			self.f = h;
+		}
+		else {
+			self.f = self.g + h;
+		}
 	}
 
-	fn out_of_line(& mut self) {
+	fn out_of_line(& mut self, greedy: bool) {
 		let mut h = 0;
-		self.f = self.g + h;
+		if greedy {
+			self.f = h;
+		}
+		else {
+			self.f = self.g + h;
+		}
 	}
 
-	fn nilsson(& mut self) {
+	fn nilsson(& mut self, greedy: bool) {
 		let mut h = 0;
-		self.f = self.g + h;
+		if greedy {
+			self.f = h;
+		}
+		else {
+			self.f = self.g + h;
+		}
 	}
 }
 
