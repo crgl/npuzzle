@@ -14,19 +14,15 @@ struct Quest {
 
 impl Quest {
 	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: Vec<Vec<usize>>) -> Quest {
-		let mut out = Quest {
+		let mut open = BinaryHeap::new();
+		open.push(Node::new(board, heur, greedy, &goal));
+		Quest {
 			goal,
-			open: BinaryHeap::new(),
+			open,
 			closed: HashSet::new(),
 			heur,
 			greedy,
-		};
-		out.add_to_open(board);
-		out
-	}
-
-	fn add_to_open(&mut self, board: Vec<Vec<usize>>) {
-		self.open.push(Node::new(board, self.heur, self.greedy, &self.goal));
+		}
 	}
 }
 
