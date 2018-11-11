@@ -43,7 +43,7 @@ enum Heuristic
 struct Node {
 	f: usize,
 	g: usize,
-	zero: (usize, usize),
+	path: Vec<(usize, usize)>,
 	board: Vec<Vec<usize>>,
 }
 
@@ -61,7 +61,9 @@ impl Node {
 				panic!();
 			}
 		};
-		let mut out = Node { f: 0, g: 0, zero, board };
+		let mut path = Vec::new();
+		path.push(zero);
+		let mut out = Node { f: 0, g: 0, path, board };
 		match heur {
 			Heuristic::Hamming => out.hamming(goal, greedy),
 			Heuristic::Manhattan => out.manhattan(goal, greedy),
@@ -114,7 +116,7 @@ impl Node {
 
 impl Ord for Node {
 	fn cmp(&self, other: &Node) -> std::cmp::Ordering {
-		self.f.cmp(&other.f)
+		std::cmp::Reverse(self.f).cmp(&std::cmp::Reverse(other.f))
 	}
 }
 
@@ -127,7 +129,7 @@ impl PartialOrd for Node {
 // ???? Maybe just make it normal
 impl PartialEq for Node {
 	fn eq(&self, other: &Node) -> bool {
-		self.f == other.f
+		self.board == other.board
 	}
 }
 
