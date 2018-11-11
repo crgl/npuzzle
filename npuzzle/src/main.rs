@@ -6,23 +6,27 @@ use std::collections::BinaryHeap;
 
 struct Quest {
 	goal: Vec<Vec<usize>>,
-	open: BinaryHeap<Node<'a>>,
-	closed: HashSet<Node<'a>>,
+	open: BinaryHeap<Node>,
+	closed: HashSet<Node>,
 	heur: Heuristic,
 	greedy: bool,
 }
 
-impl<'a> Quest<'a> {
+impl Quest {
 	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: Vec<Vec<usize>>) -> Quest {
-		let mut open = BinaryHeap::new();
-		open.push(board);
-		Quest {
+		let mut out = Quest {
 			goal,
-			open,
+			open: BinaryHeap::new(),
 			closed: HashSet::new(),
 			heur,
 			greedy,
-		}
+		};
+		out.add_to_open(board);
+		out
+	}
+
+	fn add_to_open(&mut self, board: Vec<Vec<usize>>) {
+		self.open.push(Node::new(board, self.heur, self.greedy, &self.goal));
 	}
 }
 
@@ -36,15 +40,14 @@ enum Heuristic
 }
 
 #[derive(Clone, Hash, Eq)]
-struct Node<'a> {
+struct Node {
 	f: usize,
 	g: usize,
 	zero: (usize, usize),
-	goal: &'a Vec<Vec<usize>>,
 	board: Vec<Vec<usize>>,
 }
 
-impl<'a> Node<'a> {
+impl Node {
 	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: &Vec<Vec<usize>>) -> Node {
 		let mut i = 0;
 		let zero = 'outer: loop {
@@ -58,17 +61,17 @@ impl<'a> Node<'a> {
 				panic!();
 			}
 		};
-		let mut out = Node { f: 0, g: 0, zero, goal, board };
+		let mut out = Node { f: 0, g: 0, zero, board };
 		match heur {
-			Heuristic::Hamming => out.hamming(greedy),
-			Heuristic::Manhattan => out.manhattan(greedy),
-			Heuristic::OutOfLine => out.out_of_line(greedy),
-			Heuristic::Nilsson => out.nilsson(greedy),
+			Heuristic::Hamming => out.hamming(goal, greedy),
+			Heuristic::Manhattan => out.manhattan(goal, greedy),
+			Heuristic::OutOfLine => out.out_of_line(goal, greedy),
+			Heuristic::Nilsson => out.nilsson(goal, greedy),
 		}
 		out
 	}
 
-	fn hamming(& mut self, greedy: bool) {
+	fn hamming(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
 		if greedy {
 			self.f = h;
@@ -78,7 +81,7 @@ impl<'a> Node<'a> {
 		}
 	}
 
-	fn manhattan(& mut self, greedy: bool) {
+	fn manhattan(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
 		if greedy {
 			self.f = h;
@@ -88,7 +91,7 @@ impl<'a> Node<'a> {
 		}
 	}
 
-	fn out_of_line(& mut self, greedy: bool) {
+	fn out_of_line(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
 		if greedy {
 			self.f = h;
@@ -98,7 +101,7 @@ impl<'a> Node<'a> {
 		}
 	}
 
-	fn nilsson(& mut self, greedy: bool) {
+	fn nilsson(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
 		if greedy {
 			self.f = h;
@@ -109,20 +112,20 @@ impl<'a> Node<'a> {
 	}
 }
 
-impl<'a> Ord for Node<'a> {
+impl Ord for Node {
 	fn cmp(&self, other: &Node) -> std::cmp::Ordering {
 		self.f.cmp(&other.f)
 	}
 }
 
-impl<'a> PartialOrd for Node<'a> {
+impl PartialOrd for Node {
 	fn partial_cmp(&self, other: &Node) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
 // ???? Maybe just make it normal
-impl<'a> PartialEq for Node<'a> {
+impl PartialEq for Node {
 	fn eq(&self, other: &Node) -> bool {
 		self.f == other.f
 	}
