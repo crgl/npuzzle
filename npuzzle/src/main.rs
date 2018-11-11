@@ -7,7 +7,7 @@ use std::collections::BinaryHeap;
 struct Quest {
 	goal: Vec<Vec<usize>>,
 	open: BinaryHeap<Node>,
-	closed: HashSet<Node>,
+	closed: HashSet<Vec<Vec<usize>>>,
 	heur: Heuristic,
 	greedy: bool,
 }
@@ -129,7 +129,7 @@ impl PartialOrd for Node {
 // ???? Maybe just make it normal
 impl PartialEq for Node {
 	fn eq(&self, other: &Node) -> bool {
-		self.board == other.board
+		self.f == other.f
 	}
 }
 
