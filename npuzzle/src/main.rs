@@ -24,6 +24,16 @@ impl Quest {
 			greedy,
 		}
 	}
+
+	fn print_goal(&self) {
+		for row in self.goal.iter() {
+			println!("{:?}", row);
+		}
+	}
+
+	fn peek(&self) -> &Node {
+		self.open.peek().unwrap()
+	}
 }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -69,8 +79,20 @@ impl Node {
 		out
 	}
 
+	fn dist(&self) -> usize {
+		self.f
+	}
+
 	fn hamming(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
+		let n = goal.len();
+		for i in 0..n {
+			for j in 0..n {
+				if self.board[i][j] != goal[i][j] {
+					h += 1;
+				}
+			}
+		}
 		if greedy {
 			self.f = h;
 		}
@@ -180,15 +202,29 @@ fn refine(puzzle: Vec<Vec<usize>>) -> Quest {
 	for r in 0..n {
 		let mut row = Vec::new();
 		for c in 0..n {
-			let v = 0;
-			row.push(v);
+			row.push(0);
 		}
 		goal.push(row);
 	}
+	let mut base = 0;
+	for i in 0..(n / 2) {
+		for j in i..(n - i - 1) {
+			let common = base + j - i + 1;
+			let diff = n - 2 * i - 1;
+			goal[i][j] = common;
+			goal[j][n - i - 1] = common + diff;
+			goal[n - i - 1][n - j - 1] = common + 2 * diff;
+			goal[n - j - 1][i] = common + 3 * diff;
+		}
+		base += (n - 2 * i - 1) * 4;
+	}
+	goal[n / 2][(n - 1) / 2] = 0;
 	Quest::new(puzzle, Heuristic::Hamming, false, goal)
 }
 
-fn solverize(quest: Quest) {}
+fn solverize(quest: Quest) {
+	println!("{}", quest.peek());
+}
 
 fn main() {
 	let args: Vec<String> = env::args().collect();
