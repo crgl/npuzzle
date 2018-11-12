@@ -153,6 +153,7 @@ impl Quest {
 struct Node {
 	f: i64,
 	g: i64,
+	h: i64,
 	pub path: Vec<(usize, usize)>,
 	board: Vec<Vec<usize>>,
 }
@@ -173,7 +174,7 @@ impl Node {
 		};
 		let mut path = Vec::new();
 		path.push(zero);
-		let mut out = Node { f: 0, g: 0, path, board };
+		let mut out = Node { f: 0, g: 0, h: 0, path, board };
 		match heur {
 			Heuristic::Hamming => out.hamming(goal, greedy),
 			Heuristic::Manhattan => out.manhattan(goal, greedy),
@@ -214,7 +215,7 @@ impl Node {
 	}
 
 	fn dist(&self) -> i64 {
-		-1 * (self.f + self.g)
+		self.h
 	}
 
 	fn steps(&self) -> Vec<(usize, usize)> {
@@ -236,25 +237,25 @@ impl Node {
 	}
 
 	fn hamming(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		let mut h : i64 = 0;
+		self.h = 0;
 		let n = goal.len();
 		for i in 0..n {
 			for j in 0..n {
 				if self.board[i][j] != goal[i][j] {
-					h += 1;
+					self.h += 1;
 				}
 			}
 		}
 		if greedy {
-			self.f = -1 * h;
+			self.f = -1 * self.h;
 		}
 		else {
-			self.f = -1 * (self.g + h);
+			self.f = -1 * (self.g + self.h);
 		}
 	}
 
 	fn manhattan(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		let mut h : i64 = 0;
+		self.h = 0;
 		let len = goal.len();
 		let n = len * len;
 		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
@@ -266,19 +267,19 @@ impl Node {
 			}
 		}
 		for i in 0..n {
-			h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
-			h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
+			self.h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
+			self.h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
 		}
 		if greedy {
-			self.f = -1 * h;
+			self.f = -1 * self.h;
 		}
 		else {
-			self.f = -1 * (self.g + h);
+			self.f = -1 * (self.g + self.h);
 		}
 	}
 
 	fn out_of_line(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		let mut h = 0;
+		self.h = 0;
 		let len = goal.len();
 		let n = len * len;
 		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
@@ -290,27 +291,27 @@ impl Node {
 			}
 		}
 		for i in 0..n {
-			h += match (bdp[i].0 == glp[i].0, bdp[i].1 == glp[i].1) {
+			self.h += match (bdp[i].0 == glp[i].0, bdp[i].1 == glp[i].1) {
 				(true, true) => 0,
 				(true, false) | (false, true) => 1,
 				(false, false) => 2,
 			};
 		}
 		if greedy {
-			self.f = -1 * h;
+			self.f = -1 * self.h;
 		}
 		else {
-			self.f = -1 * (self.g + h);
+			self.f = -1 * (self.g + self.h);
 		}
 	}
 
 	fn nilsson(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		let mut h = 0;
+		self.h = 0;
 		if greedy {
-			self.f = -1 * h;
+			self.f = -1 * self.h;
 		}
 		else {
-			self.f = -1 * (self.g + h);
+			self.f = -1 * (self.g + self.h);
 		}
 	}
 }
