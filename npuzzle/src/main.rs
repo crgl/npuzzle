@@ -345,7 +345,7 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 		let words = line.split_whitespace();
 		let mut tmp = Vec::new();
 		for word in words {
-			if word == "#" {
+			if word.chars().next().unwrap() == '#' {
 				break ;
 			}
 			tmp.push(word.parse::<usize>().unwrap_or(0));
@@ -489,6 +489,18 @@ mod tests {
 	#[test]
 	fn accept_valid() {
 		let mut f = File::open("puzzles/parsing/clean.txt").expect("could not open file");
+		let mut contents = String::new();
+		f.read_to_string(&mut contents).expect("could not read file");
+		let puzzle = parse_input(contents).expect("Error");
+		assert!(puzzle.len() == 3);
+		for i in 0..3 {
+			assert!(puzzle[i].len() == 3);
+		}
+	}
+
+	#[test]
+	fn accept_comments() {
+		let mut f = File::open("puzzles/parsing/comments.txt").expect("could not open file");
 		let mut contents = String::new();
 		f.read_to_string(&mut contents).expect("could not read file");
 		let puzzle = parse_input(contents).expect("Error");
