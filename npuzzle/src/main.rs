@@ -74,12 +74,12 @@ impl Quest {
 				}
 			}
 		}
-		let check = (inv_board + inv_goal + ((zero_row_board + zero_row_goal) % 2) * (len % 2)) % 2;
+		let check = (inv_board + inv_goal + ((zero_row_board + zero_row_goal) % 2) * ((len + 1) % 2)) % 2;
 		if check == 0 {
-			true
+			false
 		}
 		else {
-			false
+			true
 		}
 	}
 
