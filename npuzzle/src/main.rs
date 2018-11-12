@@ -3,6 +3,25 @@ use std::fs::File;
 use std::env;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
+use std::cmp::Ordering;
+
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+enum Heuristic
+{
+	Hamming,
+	Manhattan,
+	OutOfLine,
+	Nilsson,
+}
+
+#[derive(Copy, Clone)]
+enum Direction
+{
+	Up,
+	Down,
+	Left,
+	Right,
+}
 
 struct Quest {
 	goal: Vec<Vec<usize>>,
@@ -10,6 +29,7 @@ struct Quest {
 	closed: HashSet<Vec<Vec<usize>>>,
 	heur: Heuristic,
 	greedy: bool,
+	max_space: usize,
 }
 
 impl Quest {
@@ -22,7 +42,88 @@ impl Quest {
 			closed: HashSet::new(),
 			heur,
 			greedy,
+			max_space: 1,
 		}
+	}
+
+	fn insoluble(&self) -> bool {
+		let board = self.open.peek().unwrap().board_ref();
+		let len = board.len();
+		let n = len * len;
+		let mut inv_board = 0;
+		let mut inv_goal = 0;
+		let mut zero_row_board = 0;
+		let mut zero_row_goal = 0;
+		let mut weights_board : Vec<usize> = std::iter::repeat(0).take(n).collect();
+		let mut weights_goal = weights_board.clone();
+		for i in 0..len {
+			for j in 0..len {
+				inv_board += weights_board[board[i][j]];
+				inv_goal += weights_goal[self.goal[i][j]];
+				if board[i][j] == 0 {
+					zero_row_board = i;
+				}
+				if self.goal[i][j] == 0 {
+					zero_row_goal = i;
+				}
+				for k in 1..board[i][j] {
+					weights_board[k] += 1;
+				}
+				for k in 1..self.goal[i][j] {
+					weights_goal[k] += 1;
+				}
+			}
+		}
+		let check = (inv_board + inv_goal + ((zero_row_board + zero_row_goal) % 2) * (len % 2)) % 2;
+		if check == 0 {
+			true
+		}
+		else {
+			false
+		}
+	}
+
+	fn step(& mut self) -> Option<Node> {
+		if self.open.is_empty() {
+			return None;
+		}
+		let to_search = self.open.pop().unwrap();
+		if self.closed.contains(to_search.board_ref()) {
+			return None;
+		}
+		if to_search.dist() == 0 {
+			return Some(to_search);
+		}
+		let &(y, x) = to_search.path.last().unwrap();
+		if x > 0 {
+			let to_push = to_search.shift(Direction::Left, self.heur, self.greedy, &self.goal);
+			if !self.closed.contains(to_push.board_ref()) {
+				self.open.push(to_push);
+			}
+		}
+		if x < self.goal.len() - 1 {
+			let to_push = to_search.shift(Direction::Right, self.heur, self.greedy, &self.goal);
+			if !self.closed.contains(to_push.board_ref()) {
+				self.open.push(to_push);
+			}
+		}
+		if y > 0 {
+			let to_push = to_search.shift(Direction::Up, self.heur, self.greedy, &self.goal);
+			if !self.closed.contains(to_push.board_ref()) {
+				self.open.push(to_push);
+			}
+		}
+		if y < self.goal.len() - 1 {
+			let to_push = to_search.shift(Direction::Down, self.heur, self.greedy, &self.goal);
+			if !self.closed.contains(to_push.board_ref()) {
+				self.open.push(to_push);
+			}
+		}
+		self.closed.insert(to_search.into_board());
+		if self.open.len() > self.max_space {
+			self.max_space = self.open.len();
+		}
+		None
 	}
 
 	fn print_goal(&self) {
@@ -31,25 +132,28 @@ impl Quest {
 		}
 	}
 
-	fn peek(&self) -> &Node {
-		self.open.peek().unwrap()
+	fn peek(&self) -> Option<&Node> {
+		self.open.peek()
 	}
-}
 
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
-enum Heuristic
-{
-	Hamming,
-	Manhattan,
-	OutOfLine,
-	Nilsson,
+	fn continues(&self) -> bool {
+		!self.open.is_empty()
+	}
+
+	fn space(&self) -> usize {
+		self.max_space
+	}
+
+	fn time(&self) -> usize {
+		self.closed.len()
+	}
 }
 
 #[derive(Clone, Hash, Eq)]
 struct Node {
-	f: usize,
-	g: usize,
-	path: Vec<(usize, usize)>,
+	f: i64,
+	g: i64,
+	pub path: Vec<(usize, usize)>,
 	board: Vec<Vec<usize>>,
 }
 
@@ -79,12 +183,60 @@ impl Node {
 		out
 	}
 
-	fn dist(&self) -> usize {
-		self.f
+	fn shift(&self, dir: Direction, heur: Heuristic, greedy: bool, goal: &Vec<Vec<usize>>) -> Self {
+		let mut out = self.clone();
+		out.swap(dir);
+		match heur {
+			Heuristic::Hamming => out.hamming(goal, greedy),
+			Heuristic::Manhattan => out.manhattan(goal, greedy),
+			Heuristic::OutOfLine => out.out_of_line(goal, greedy),
+			Heuristic::Nilsson => out.nilsson(goal, greedy),
+		}
+		out
+	}
+
+	fn swap(& mut self, dir: Direction) {
+		let &curr = self.path.last().unwrap();
+		let next = match dir {
+			Direction::Up => (curr.0 - 1, curr.1),
+			Direction::Down => (curr.0 + 1, curr.1),
+			Direction::Left => (curr.0, curr.1 - 1),
+			Direction::Right => (curr.0, curr.1 + 1),
+		};
+		self.board[curr.0][curr.1] = self.board[next.0][next.1];
+		self.board[next.0][next.1] = 0;
+		self.path.push(next);
+		self.inc();
+	}
+
+	fn inc(& mut self) {
+		self.g += 1;
+	}
+
+	fn dist(&self) -> i64 {
+		-1 * (self.f + self.g)
+	}
+
+	fn steps(&self) -> Vec<(usize, usize)> {
+		self.path.clone()
+	}
+
+	fn board_ref(&self) -> &Vec<Vec<usize>> {
+		&self.board
+	}
+
+	fn into_board(self) -> Vec<Vec<usize>> {
+		self.board
+	}
+
+	fn print_board(&self) {
+		for row in self.board.iter() {
+			println!("{:?}", row);
+		}
 	}
 
 	fn hamming(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		let mut h = 0;
+		let mut h : i64 = 0;
 		let n = goal.len();
 		for i in 0..n {
 			for j in 0..n {
@@ -94,52 +246,87 @@ impl Node {
 			}
 		}
 		if greedy {
-			self.f = h;
+			self.f = -1 * h;
 		}
 		else {
-			self.f = self.g + h;
+			self.f = -1 * (self.g + h);
 		}
 	}
 
 	fn manhattan(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		let mut h = 0;
+		let mut h : i64 = 0;
+		let len = goal.len();
+		let n = len * len;
+		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
+		let mut glp = bdp.clone();
+		for i in 0..len {
+			for j in 0..len {
+				bdp[self.board[i][j]] = (i, j);
+				glp[goal[i][j]] = (i, j);
+			}
+		}
+		for i in 0..n {
+			h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
+			h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
+		}
 		if greedy {
-			self.f = h;
+			self.f = -1 * h;
 		}
 		else {
-			self.f = self.g + h;
+			self.f = -1 * (self.g + h);
 		}
 	}
 
 	fn out_of_line(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
+		let len = goal.len();
+		let n = len * len;
+		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
+		let mut glp = bdp.clone();
+		for i in 0..len {
+			for j in 0..len {
+				bdp[self.board[i][j]] = (i, j);
+				glp[goal[i][j]] = (i, j);
+			}
+		}
+		for i in 0..n {
+			h += match (bdp[i].0 == glp[i].0, bdp[i].1 == glp[i].1) {
+				(true, true) => 0,
+				(true, false) | (false, true) => 1,
+				(false, false) => 2,
+			};
+		}
 		if greedy {
-			self.f = h;
+			self.f = -1 * h;
 		}
 		else {
-			self.f = self.g + h;
+			self.f = -1 * (self.g + h);
 		}
 	}
 
 	fn nilsson(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		let mut h = 0;
 		if greedy {
-			self.f = h;
+			self.f = -1 * h;
 		}
 		else {
-			self.f = self.g + h;
+			self.f = -1 * (self.g + h);
 		}
 	}
 }
 
 impl Ord for Node {
-	fn cmp(&self, other: &Node) -> std::cmp::Ordering {
-		std::cmp::Reverse(self.f).cmp(&std::cmp::Reverse(other.f))
+	fn cmp(&self, other: &Node) -> Ordering {
+		match self.f.cmp(&other.f) {
+			Ordering::Less => Ordering::Less,
+			Ordering::Equal => self.g.cmp(&other.g),
+			Ordering::Greater => Ordering::Greater,
+		}
 	}
 }
 
 impl PartialOrd for Node {
-	fn partial_cmp(&self, other: &Node) -> Option<std::cmp::Ordering> {
+	fn partial_cmp(&self, other: &Node) -> Option<Ordering> {
 		Some(self.cmp(other))
 	}
 }
@@ -147,7 +334,7 @@ impl PartialOrd for Node {
 // ???? Maybe just make it normal
 impl PartialEq for Node {
 	fn eq(&self, other: &Node) -> bool {
-		self.f == other.f
+		self.f == other.f && self.g == other.g
 	}
 }
 
@@ -219,11 +406,22 @@ fn refine(puzzle: Vec<Vec<usize>>) -> Quest {
 		base += (n - 2 * i - 1) * 4;
 	}
 	goal[n / 2][(n - 1) / 2] = 0;
-	Quest::new(puzzle, Heuristic::Hamming, false, goal)
+	Quest::new(puzzle, Heuristic::Manhattan, false, goal)
 }
 
-fn solverize(quest: Quest) {
-	println!("{}", quest.peek());
+fn solverize(mut quest: Quest) {
+	while quest.continues() {
+		let mut out = match quest.step() {
+			Some(output) => output,
+			None => continue,
+		};
+		println!("space: {}", quest.space());
+		println!("time: {}", quest.time());
+		println!("steps: {}", out.steps().len() - 1);
+		println!("dist: {}", out.dist());
+		return ;
+	}
+	println!("Unstackable cups!");
 }
 
 fn main() {
@@ -236,7 +434,12 @@ fn main() {
 	f.read_to_string(&mut contents).expect("could not read file");
 	let puzzle = parse_input(contents).expect("invalid puzzle");
 	let quest = refine(puzzle);
-	solverize(quest);
+	if quest.insoluble() {
+		println!("Unstackable cups!");
+	}
+	else {
+		solverize(quest);
+	}
 }
 
 #[cfg(test)]
