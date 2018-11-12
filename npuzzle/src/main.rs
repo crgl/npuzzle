@@ -141,7 +141,9 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 			}
 			tmp.push(word.parse::<usize>().unwrap_or(0));
 		}
-		out.push(tmp);
+		if !tmp.is_empty() {
+			out.push(tmp);
+		}
 	}
 	if out.is_empty() {
 		return Err("no input");
@@ -172,6 +174,22 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 	Ok(out)
 }
 
+fn refine(puzzle: Vec<Vec<usize>>) -> Quest {
+	let n = puzzle.len();
+	let mut goal = Vec::new();
+	for r in 0..n {
+		let mut row = Vec::new();
+		for c in 0..n {
+			let v = 0;
+			row.push(v);
+		}
+		goal.push(row);
+	}
+	Quest::new(puzzle, Heuristic::Hamming, false, goal)
+}
+
+fn solverize(quest: Quest) {}
+
 fn main() {
 	let args: Vec<String> = env::args().collect();
 	if args.len() < 2 {
@@ -181,7 +199,8 @@ fn main() {
 	let mut contents = String::new();
 	f.read_to_string(&mut contents).expect("could not read file");
 	let puzzle = parse_input(contents).expect("invalid puzzle");
-	println!("{:?}", puzzle[0]);
+	let quest = refine(puzzle);
+	solverize(quest);
 }
 
 #[cfg(test)]
