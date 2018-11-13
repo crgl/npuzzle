@@ -329,7 +329,7 @@ impl Node {
 				if (self.board[i][j] != 0 && self.board[i][j] != n - 1) && self.board[i][j] + 1 != self.board[i][j + 1] {
 					self.h += 6;
 				}
-				if (self.board[j][len - i - 1] != 0 && self.board[j][len - i - 1] != n - 1) && self.board[j][len - i - 1] + 1 != self.board[j][len - i - 1] {
+				if (self.board[j][len - i - 1] != 0 && self.board[j][len - i - 1] != n - 1) && self.board[j][len - i - 1] + 1 != self.board[j + 1][len - i - 1] {
 					self.h += 6;
 				}
 				if (self.board[len - i - 1][len - j - 1] != 0 && self.board[len - i - 1][len - j - 1] != n - 1) && self.board[len - i - 1][len - j - 1] + 1 != self.board[len - i - 1][len - j - 2] {
