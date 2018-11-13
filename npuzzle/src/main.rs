@@ -3,6 +3,7 @@ use std::fs::File;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use rand::{thread_rng, Rng};
 
 use clap::{Arg, App};
 
@@ -413,7 +414,7 @@ fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
 
 fn solverize(mut quest: Quest) {
 	while quest.continues() {
-		let mut out = match quest.step() {
+		let out = match quest.step() {
 			Some(output) => output,
 			None => continue,
 		};
@@ -427,10 +428,20 @@ fn solverize(mut quest: Quest) {
 }
 
 fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
-	let mut f = File::open("puzzles/goal_creation/three.txt").expect("could not open file");
-	let mut contents = String::new();
-	f.read_to_string(&mut contents).expect("could not read file");
-	parse_input(contents).expect("invalid puzzle")
+	let mut arr = Vec::with_capacity(len * len);
+	for x in 0..(len*len) {
+		arr.push(x);
+	}
+	thread_rng().shuffle(&mut arr);
+	let mut out = Vec::with_capacity(len);
+	for n in 0..len {
+		let mut row = Vec::with_capacity(len);
+		for i in 0..len {
+			row.push(arr.pop().unwrap());
+		}
+		out.push(row);
+	}
+	out
 }
 
 fn main() {
