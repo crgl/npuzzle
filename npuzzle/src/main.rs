@@ -309,6 +309,42 @@ impl Node {
 
 	fn nilsson(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
 		self.h = 0;
+		let len = goal.len();
+		let n = len * len;
+		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
+		let mut glp = bdp.clone();
+		for i in 0..len {
+			for j in 0..len {
+				bdp[self.board[i][j]] = (i, j);
+				glp[goal[i][j]] = (i, j);
+			}
+		}
+		for i in 0..n {
+			self.h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
+			self.h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
+		}
+		let mut base = 0;
+		for i in 0..(len / 2) {
+			for j in i..(len - i - 1) {
+				if (self.board[i][j] != 0 && self.board[i][j] != n - 1) && self.board[i][j] + 1 != self.board[i][j + 1] {
+					self.h += 6;
+				}
+				if (self.board[j][len - i - 1] != 0 && self.board[j][len - i - 1] != n - 1) && self.board[j][len - i - 1] + 1 != self.board[j][len - i - 1] {
+					self.h += 6;
+				}
+				if (self.board[len - i - 1][len - j - 1] != 0 && self.board[len - i - 1][len - j - 1] != n - 1) && self.board[len - i - 1][len - j - 1] + 1 != self.board[len - i - 1][len - j - 2] {
+					self.h += 6;
+				}
+				if (self.board[len - j - 1][i] != 0 && self.board[len - j - 1][i] != n - 1) && self.board[len - j - 1][i] + 1 != self.board[len - j - 2][i] {
+					if i != len / 2 - 1 || (len % 2) != 0 {
+						self.h += 6;
+					}
+				}
+			}
+		}
+		if self.board[len / 2][(len - 1) / 2] != 0 {
+			self.h += 3;
+		}
 		if greedy {
 			self.f = -1 * self.h;
 		}
@@ -487,7 +523,10 @@ fn main() {
 		"nilsson" => Heuristic::Nilsson,
 		_ => Heuristic::Manhattan,
 	};
-	let quest = refine(puzzle, heur, greedy);
+	let quest = refine(puzzle.clone(), heur, greedy);
+	for row in puzzle.iter() {
+		println!("{:?}", row);
+	}
 	if quest.insoluble() {
 		println!("Unstackable cups!");
 	}
