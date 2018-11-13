@@ -1,9 +1,10 @@
 use std::io::prelude::*;
 use std::fs::File;
-use std::env;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+
+use clap::{Arg, App};
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 enum Heuristic
@@ -384,7 +385,7 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 	Ok(out)
 }
 
-fn refine(puzzle: Vec<Vec<usize>>) -> Quest {
+fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
 	let n = puzzle.len();
 	let mut goal = Vec::new();
 	for r in 0..n {
@@ -407,7 +408,7 @@ fn refine(puzzle: Vec<Vec<usize>>) -> Quest {
 		base += (n - 2 * i - 1) * 4;
 	}
 	goal[n / 2][(n - 1) / 2] = 0;
-	Quest::new(puzzle, Heuristic::Manhattan, false, goal)
+	Quest::new(puzzle, heur, greedy, goal)
 }
 
 fn solverize(mut quest: Quest) {
@@ -425,16 +426,55 @@ fn solverize(mut quest: Quest) {
 	println!("Unstackable cups!");
 }
 
-fn main() {
-	let args: Vec<String> = env::args().collect();
-	if args.len() < 2 {
-		panic!("usage: cargo run puzzle.txt");
-	}
-	let mut f = File::open(&args[1]).expect("could not open file");
+fn puzzle_gen() -> Vec<Vec<usize>> {
+	let mut f = File::open("puzzles/goal_creation/three.txt").expect("could not open file");
 	let mut contents = String::new();
 	f.read_to_string(&mut contents).expect("could not read file");
-	let puzzle = parse_input(contents).expect("invalid puzzle");
-	let quest = refine(puzzle);
+	parse_input(contents).expect("invalid puzzle")
+}
+
+fn main() {
+	let matches = App::new("npuzzle")
+                          .version("1.0")
+                          .author("Tomas D. <chagle27@gmail.com>")
+                          .about("Solves the npuzzle")
+                          .arg(Arg::with_name("greedy")
+                               .short("g")
+                               .long("greedy")
+                               .help("Sets search to greedy"))
+                          .arg(Arg::with_name("INPUT")
+                               .help("Sets the input file to use")
+                               .required(true)
+                               .index(1))
+                          .arg(Arg::with_name("heuristic")
+                               .short("h")
+							   .long("heuristic")
+                               .help("Sets the heuristic")
+							   .takes_value(true))
+						  .arg(Arg::with_name("auto")
+						  	   .short("a")
+							   .long("auto")
+							   .help("Auto-generates board")
+							   .conflicts_with("INPUT"))
+                          .get_matches();
+	let puzzle = if matches.is_present("auto") {
+		puzzle_gen()
+	}
+	else {
+		let mut f = File::open(matches.value_of("INPUT").unwrap()).expect("could not open file");
+		let mut contents = String::new();
+		f.read_to_string(&mut contents).expect("could not read file");
+		parse_input(contents).expect("invalid puzzle")
+	};
+	let greedy = matches.is_present("greedy");
+	let heur = match matches.value_of("heuristic").unwrap_or("manhattan") {
+		"manhattan" => Heuristic::Manhattan,
+		"hamming" => Heuristic::Hamming,
+		"ool" => Heuristic::OutOfLine,
+		"nilsson" => Heuristic::Nilsson,
+		_ => Heuristic::Manhattan,
+	};
+	let quest = refine(puzzle, heur, greedy);
 	if quest.insoluble() {
 		println!("Unstackable cups!");
 	}

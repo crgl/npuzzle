@@ -5,3 +5,4 @@ authors = ["Charles Gleason <cgleason@student.42.us.org>"]
 edition = "2018"
 
 [dependencies]
+clap = "~2.32.0"
