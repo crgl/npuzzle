@@ -336,7 +336,7 @@ impl Node {
 					self.h += 6;
 				}
 				if (self.board[len - j - 1][i] != 0 && self.board[len - j - 1][i] != n - 1) && self.board[len - j - 1][i] + 1 != self.board[len - j - 2][i] {
-					if i != len / 2 - 1 || (len % 2) != 0 {
+					if i == (len - 1) / 2 {
 						self.h += 6;
 					}
 				}
