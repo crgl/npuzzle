@@ -426,7 +426,7 @@ fn solverize(mut quest: Quest) {
 	println!("Unstackable cups!");
 }
 
-fn puzzle_gen() -> Vec<Vec<usize>> {
+fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
 	let mut f = File::open("puzzles/goal_creation/three.txt").expect("could not open file");
 	let mut contents = String::new();
 	f.read_to_string(&mut contents).expect("could not read file");
@@ -445,6 +445,7 @@ fn main() {
                           .arg(Arg::with_name("INPUT")
                                .help("Sets the input file to use")
                                .required(true)
+							   .conflicts_with("auto")
                                .index(1))
                           .arg(Arg::with_name("heuristic")
                                .short("h")
@@ -455,10 +456,10 @@ fn main() {
 						  	   .short("a")
 							   .long("auto")
 							   .help("Auto-generates board")
-							   .conflicts_with("INPUT"))
+							   .takes_value(true))
                           .get_matches();
 	let puzzle = if matches.is_present("auto") {
-		puzzle_gen()
+		puzzle_gen(matches.value_of("auto").unwrap().parse::<usize>().unwrap_or(3))
 	}
 	else {
 		let mut f = File::open(matches.value_of("INPUT").unwrap()).expect("could not open file");
