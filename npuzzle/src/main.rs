@@ -4,8 +4,12 @@ use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use rand::{thread_rng, Rng};
-
 use clap::{Arg, App};
+use piston::window::WindowSettings;
+use piston::event_loop::*;
+use piston::input::*;
+use glutin_window::GlutinWindow as Window;
+use opengl_graphics::{ GlGraphics, OpenGL };
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 enum Heuristic
