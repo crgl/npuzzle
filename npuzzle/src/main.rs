@@ -12,38 +12,42 @@ use glutin_window::GlutinWindow as Window;
 use opengl_graphics::{ GlGraphics, OpenGL };
 
 pub struct Viz {
-    gl: GlGraphics, // OpenGL drawing backend.
+	gl: GlGraphics, // OpenGL drawing backend.
 	step: usize, // Current location in sequence 
 	steps: Vec<(usize, usize)>, // sequence
 	board: Vec<Vec<usize>>, // starting board
 }
 
 impl Viz {
-    fn render(&mut self, args: &RenderArgs) {
-        use graphics::*;
+	fn render(&mut self, args: &RenderArgs) {
+		use graphics::*;
 
-        const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
-        const WHITE:   [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+		const BLACK: [f32; 4] = [0.0; 4];
+		const WHITE:   [f32; 4] = [1.0; 4];
 
-        let square = rectangle::square(0.0, 0.0, 50.0);
-        let (x, y) = ((args.width / 2) as f64,
-                      (args.height / 2) as f64);
+		let n = self.board.len() as u32;
+		let square = rectangle::square(0.0, 0.0, (args.width / n) as f64 - 2.);
 
-        self.gl.draw(args.viewport(), |c, gl| {
-            // Clear the screen.
-            clear(BLACK, gl);
+		self.gl.draw(args.viewport(), |c, gl| {
+			// Clear the screen.
+			clear(BLACK, gl);
 
-            let transform = c.transform.trans(x, y)
-                                       .trans(-25.0, -25.0);
 
-            // Draw a box rotating around the middle of the screen.
-            rectangle(WHITE, square, transform, gl);
-        });
-    }
+			// Draw a box rotating around the middle of the screen.
+			for i in 0..n {
+				for j in 0..n {
+					let (x, y) = ((j * args.width / n) as f64,
+								  (i * args.height / n) as f64);
+					let transform = c.transform.trans(x, y);
+					rectangle(WHITE, square, transform, gl);
+				}
+			}
+		});
+	}
 
-    fn update(&mut self, args: &UpdateArgs) {
-        self.step += 1;
-    }
+	fn update(&mut self, args: &UpdateArgs) {
+		self.step += 1;
+	}
 }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
@@ -522,22 +526,22 @@ fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
 
 fn main() {
 	let matches = App::new("npuzzle")
-                          .version("1.0")
-                          .author("Tomas D. <chagle27@gmail.com>")
-                          .about("Solves the npuzzle")
-                          .arg(Arg::with_name("greedy")
-                               .short("g")
-                               .long("greedy")
-                               .help("Sets search to greedy"))
-                          .arg(Arg::with_name("INPUT")
-                               .help("Sets the input file to use")
-                               .required(true)
+						  .version("1.0")
+						  .author("Tomas D. <chagle27@gmail.com>")
+						  .about("Solves the npuzzle")
+						  .arg(Arg::with_name("greedy")
+							   .short("g")
+							   .long("greedy")
+							   .help("Sets search to greedy"))
+						  .arg(Arg::with_name("INPUT")
+							   .help("Sets the input file to use")
+							   .required(true)
 							   .conflicts_with("auto")
-                               .index(1))
-                          .arg(Arg::with_name("heuristic")
-                               .short("h")
+							   .index(1))
+						  .arg(Arg::with_name("heuristic")
+							   .short("h")
 							   .long("heuristic")
-                               .help("Sets the heuristic")
+							   .help("Sets the heuristic")
 							   .takes_value(true)
 							   .possible_values(&["manhattan", "hamming", "ool", "nilsson"]))
 						  .arg(Arg::with_name("auto")
@@ -545,7 +549,7 @@ fn main() {
 							   .long("auto")
 							   .help("Auto-generates board")
 							   .takes_value(true))
-                          .get_matches();
+						  .get_matches();
 	let puzzle = if matches.is_present("auto") {
 		puzzle_gen(matches.value_of("auto").unwrap().parse::<usize>().unwrap_or(3))
 	}
@@ -576,7 +580,7 @@ fn main() {
 		let opengl = OpenGL::V3_2;
 		let mut window: Window = WindowSettings::new(
 				"white-square",
-				[200, 200]
+				[500, 500]
 			)
 			.opengl(opengl)
 			.exit_on_esc(true)
