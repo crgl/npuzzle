@@ -3,50 +3,108 @@ use std::fs::File;
 use std::collections::HashSet;
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+
 use rand::{thread_rng, Rng};
+
 use clap::{Arg, App};
+
 use piston::window::WindowSettings;
 use piston::event_loop::*;
 use piston::input::*;
 use glutin_window::GlutinWindow as Window;
-use opengl_graphics::{ GlGraphics, OpenGL };
+use opengl_graphics::{ GlGraphics, OpenGL, Texture };
+use piston_window::TextureSettings;
+use std::path::Path;
 
 pub struct Viz {
 	gl: GlGraphics, // OpenGL drawing backend.
 	step: usize, // Current location in sequence 
 	steps: Vec<(usize, usize)>, // sequence
 	board: Vec<Vec<usize>>, // starting board
+	imgref: Vec<(graphics::Image, Texture)>, // images
 }
 
 impl Viz {
+	fn new(gl: GlGraphics, steps: Vec<(usize, usize)>, board: Vec<Vec<usize>>, goal: &Vec<Vec<usize>>, width: u32) -> Viz {
+		use graphics::*;
+
+		let n = goal.len();
+		let width = width as usize;
+		let defT = TextureSettings::new();
+		let mut imgref : Vec<(Image, Texture)> = Vec::with_capacity(n * n);
+		for _ in 0..(n * n) {
+			let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
+			let texture = Texture::from_path(Path::new("assets/argyle.png"), &defT).unwrap();
+			imgref.push((piece, texture));
+		}
+		if n < 8 {
+			for i in 0..n {
+				for j in 0..n {
+					let mut p = "assets/split-2018-11-14/".to_owned();
+					p.push_str(&(i.to_string()));
+					p.push_str(&(j.to_string()));
+					p.push_str(".png");
+					if goal[i][j] != 0 {
+						imgref[goal[i][j]].1 = Texture::from_path(Path::new(&p), &defT).unwrap();
+					}
+					else {
+						imgref[goal[i][j]].1 = Texture::from_path(Path::new("assets/Solid_black.png"), &defT).unwrap();
+					}
+				}
+			}
+		}
+		Viz {
+			gl,
+			step: 0,
+			steps,
+			board,
+			imgref,
+		}
+	}
+
 	fn render(&mut self, args: &RenderArgs) {
 		use graphics::*;
 
 		const BLACK: [f32; 4] = [0.0; 4];
 		const WHITE:   [f32; 4] = [1.0; 4];
+		let mut color: [f32; 4] = [0.0; 4];
 
 		let n = self.board.len() as u32;
-		let square = rectangle::square(0.0, 0.0, (args.width / n) as f64 - 2.);
+		let defD = DrawState::default();
 
 		self.gl.draw(args.viewport(), |c, gl| {
-			// Clear the screen.
 			clear(BLACK, gl);
-
-
-			// Draw a box rotating around the middle of the screen.
-			for i in 0..n {
-				for j in 0..n {
-					let (x, y) = ((j * args.width / n) as f64,
-								  (i * args.height / n) as f64);
-					let transform = c.transform.trans(x, y);
-					rectangle(WHITE, square, transform, gl);
-				}
-			}
 		});
+		for i in 0..n {
+			for j in 0..n {
+				let (x, y) = ((j * args.width / n) as f64,
+							  (i * args.height / n) as f64);
+				// let mut val = self.board[i as usize][j as usize] as f32;
+				// if val != 0.0 {
+				// 	val += (n * n) as f32;
+				// }
+				// for k in 0..4 {
+				// 	color[k] = val / ((n * n) as f32 * 2.);
+				// }
+				let val = self.board[i as usize][j as usize];
+				let ref piece = self.imgref[val].0;
+				let ref texture = self.imgref[val].1;
+				self.gl.draw(args.viewport(), |c, gl| {
+					let transform = c.transform.trans(x, y);
+					piece.draw(texture, &defD, transform, gl)
+				});
+			}
+		}
 	}
 
 	fn update(&mut self, args: &UpdateArgs) {
-		self.step += 1;
+		if self.step < self.steps.len() - 1 {
+			self.step += 1;
+			let (y1, x1) = self.steps[self.step - 1];
+			let (y2, x2) = self.steps[self.step];
+			self.board[y1][x1] = self.board[y2][x2];
+			self.board[y2][x2] = 0;
+		}
 	}
 }
 
@@ -175,6 +233,10 @@ impl Quest {
 		for row in self.goal.iter() {
 			println!("{:?}", row);
 		}
+	}
+
+	fn get_goal(&self) -> Vec<Vec<usize>> {
+		self.goal.clone()
 	}
 
 	fn peek(&self) -> Option<&Node> {
@@ -571,28 +633,34 @@ fn main() {
 	for row in puzzle.iter() {
 		println!("{:?}", row);
 	}
+	let goal = quest.get_goal();
 	if quest.insoluble() {
 		println!("Unstackable cups!");
 	}
 	else {
 		let steps = solverize(quest);
+		let width = 500;
 
 		let opengl = OpenGL::V3_2;
 		let mut window: Window = WindowSettings::new(
 				"white-square",
-				[500, 500]
+				[width, width]
 			)
 			.opengl(opengl)
 			.exit_on_esc(true)
 			.build()
 			.unwrap();
-		let mut viz = Viz {
-			gl: GlGraphics::new(opengl),
-			step: 0,
-			steps,
-			board: puzzle,
-		};
+		let mut viz = Viz::new(GlGraphics::new(opengl), steps, puzzle, &goal, width);
+		// let mut viz = Viz {
+		// 	gl: GlGraphics::new(opengl),
+		// 	step: 0,
+		// 	steps,
+		// 	board: puzzle,
+		// };
 		let mut events = Events::new(EventSettings::new());
+		let ufps = 8;
+		events.set_max_fps(ufps);
+		events.set_ups(ufps);
 		while let Some(e) = events.next(&mut window) {
 			if let Some(r) = e.render_args() {
 				viz.render(&r);
