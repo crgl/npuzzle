@@ -11,6 +11,41 @@ use piston::input::*;
 use glutin_window::GlutinWindow as Window;
 use opengl_graphics::{ GlGraphics, OpenGL };
 
+pub struct Viz {
+    gl: GlGraphics, // OpenGL drawing backend.
+	step: usize, // Current location in sequence 
+	steps: Vec<(usize, usize)>, // sequence
+	board: Vec<Vec<usize>>, // starting board
+}
+
+impl Viz {
+    fn render(&mut self, args: &RenderArgs) {
+        use graphics::*;
+
+        const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 0.0];
+        const WHITE:   [f32; 4] = [1.0, 1.0, 1.0, 1.0];
+
+        let square = rectangle::square(0.0, 0.0, 50.0);
+        let (x, y) = ((args.width / 2) as f64,
+                      (args.height / 2) as f64);
+
+        self.gl.draw(args.viewport(), |c, gl| {
+            // Clear the screen.
+            clear(BLACK, gl);
+
+            let transform = c.transform.trans(x, y)
+                                       .trans(-25.0, -25.0);
+
+            // Draw a box rotating around the middle of the screen.
+            rectangle(WHITE, square, transform, gl);
+        });
+    }
+
+    fn update(&mut self, args: &UpdateArgs) {
+        self.step += 1;
+    }
+}
+
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 enum Heuristic
 {
@@ -452,7 +487,7 @@ fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
 	Quest::new(puzzle, heur, greedy, goal)
 }
 
-fn solverize(mut quest: Quest) {
+fn solverize(mut quest: Quest) -> Vec<(usize, usize)> {
 	while quest.continues() {
 		let out = match quest.step() {
 			Some(output) => output,
@@ -462,9 +497,10 @@ fn solverize(mut quest: Quest) {
 		println!("time: {}", quest.time());
 		println!("steps: {}", out.steps().len() - 1);
 		println!("dist: {}", out.dist());
-		return ;
+		return out.steps().clone();
 	}
 	println!("Unstackable cups!");
+	return Vec::new();
 }
 
 fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
@@ -535,7 +571,32 @@ fn main() {
 		println!("Unstackable cups!");
 	}
 	else {
-		solverize(quest);
+		let steps = solverize(quest);
+
+		let opengl = OpenGL::V3_2;
+		let mut window: Window = WindowSettings::new(
+				"white-square",
+				[200, 200]
+			)
+			.opengl(opengl)
+			.exit_on_esc(true)
+			.build()
+			.unwrap();
+		let mut viz = Viz {
+			gl: GlGraphics::new(opengl),
+			step: 0,
+			steps,
+			board: puzzle,
+		};
+		let mut events = Events::new(EventSettings::new());
+		while let Some(e) = events.next(&mut window) {
+			if let Some(r) = e.render_args() {
+				viz.render(&r);
+			}
+			if let Some(u) = e.update_args() {
+				viz.update(&u);
+			}
+		}
 	}
 }
 
