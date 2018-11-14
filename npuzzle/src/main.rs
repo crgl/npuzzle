@@ -583,6 +583,13 @@ fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
 		}
 		out.push(row);
 	}
+	let mut tmp = File::create("puzzles/tmp.txt").unwrap();
+	for row in out.iter() {
+		for e in row.iter() {
+			write!(tmp, "{} ", e);
+		}
+		tmp.write(b"\n");
+	}
 	out
 }
 
