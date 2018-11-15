@@ -198,7 +198,6 @@ impl Viz {
 		use graphics::*;
 
 		const BLACK: [f32; 4] = [0.0; 4];
-		let mut color: [f32; 4] = [0.0; 4];
 
 		let n = self.board.len() as u32;
 		let def_d = DrawState::default();
@@ -353,18 +352,8 @@ impl Quest {
 		None
 	}
 
-	fn print_goal(&self) {
-		for row in self.goal.iter() {
-			println!("{:?}", row);
-		}
-	}
-
 	fn get_goal(&self) -> Vec<Vec<usize>> {
 		self.goal.clone()
-	}
-
-	fn peek(&self) -> Option<&Node> {
-		self.open.peek()
 	}
 
 	fn continues(&self) -> bool {
@@ -653,9 +642,9 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
 	let n = puzzle.len();
 	let mut goal = Vec::new();
-	for r in 0..n {
+	for _ in 0..n {
 		let mut row = Vec::new();
-		for c in 0..n {
+		for _ in 0..n {
 			row.push(0);
 		}
 		goal.push(row);
@@ -699,9 +688,9 @@ fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
 	}
 	thread_rng().shuffle(&mut arr);
 	let mut out = Vec::with_capacity(len);
-	for n in 0..len {
+	for _ in 0..len {
 		let mut row = Vec::with_capacity(len);
-		for i in 0..len {
+		for _ in 0..len {
 			row.push(arr.pop().unwrap());
 		}
 		out.push(row);
@@ -770,7 +759,8 @@ fn main() {
 						  	   .short("a")
 							   .long("auto")
 							   .help("Auto-generates board")
-							   .takes_value(true))
+							   .takes_value(true)
+							   .possible_values(&["2", "3", "4", "5", "6", "7"]))
 						  .arg(Arg::with_name("mine")
 							   .short("m")
 							   .long("mine")
@@ -808,7 +798,7 @@ fn main() {
 	else {
 		let width = 500;
 		let opengl = OpenGL::V3_2;
-		let mut window: Window = WindowSettings::new(
+		let window: Window = WindowSettings::new(
 				"white-square",
 				[width, width]
 			)
