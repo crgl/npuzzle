@@ -79,13 +79,6 @@ impl Viz {
 			for j in 0..n {
 				let (x, y) = ((j * args.width / n) as f64,
 							  (i * args.height / n) as f64);
-				// let mut val = self.board[i as usize][j as usize] as f32;
-				// if val != 0.0 {
-				// 	val += (n * n) as f32;
-				// }
-				// for k in 0..4 {
-				// 	color[k] = val / ((n * n) as f32 * 2.);
-				// }
 				let val = self.board[i as usize][j as usize];
 				let ref piece = self.imgref[val].0;
 				let ref texture = self.imgref[val].1;
