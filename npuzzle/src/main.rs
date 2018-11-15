@@ -16,6 +16,138 @@ use opengl_graphics::{ GlGraphics, OpenGL, Texture };
 use piston_window::TextureSettings;
 use std::path::Path;
 
+pub struct Game {
+	gl: GlGraphics,
+	zero: (usize, usize),
+	board: Vec<Vec<usize>>,
+	goal: Vec<Vec<usize>>,
+	imgref: Vec<(graphics::Image, Texture)>,
+	complete: bool,
+	missing: (graphics::Image, Texture),
+}
+
+impl Game {
+	fn new(gl: GlGraphics, board: Vec<Vec<usize>>, goal: Vec<Vec<usize>>, width: u32) -> Game {
+		use graphics::*;
+
+		let n = goal.len();
+		let width = width as usize;
+		let def_t = TextureSettings::new();
+		let mut imgref : Vec<(Image, Texture)> = Vec::with_capacity(n * n);
+		for _ in 0..(n * n) {
+			let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
+			let texture = Texture::from_path(Path::new("assets/argyle.png"), &def_t).unwrap();
+			imgref.push((piece, texture));
+		}
+		let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
+		let texture = Texture::from_path(Path::new("assets/argyle.png"), &def_t).unwrap();
+		let mut missing = (piece, texture);
+		let mut zero = (0, 0);
+		if n < 8 {
+			for i in 0..n {
+				for j in 0..n {
+					let mut p = "assets/split-2018-11-14/".to_owned();
+					p.push_str(&(i.to_string()));
+					p.push_str(&(j.to_string()));
+					p.push_str(".png");
+					if goal[i][j] != 0 {
+						imgref[goal[i][j]].1 = Texture::from_path(Path::new(&p), &def_t).unwrap();
+					}
+					else {
+						missing.1 = Texture::from_path(Path::new(&p), &def_t).unwrap();
+						imgref[goal[i][j]].1 = Texture::from_path(Path::new("assets/Solid_black.png"), &def_t).unwrap();
+					}
+					if board[i][j] == 0 {
+						zero = (i, j);
+					}
+				}
+			}
+		}
+		let complete = board == goal;
+		Game {
+			gl,
+			zero,
+			board,
+			goal,
+			imgref,
+			complete,
+			missing,
+		}
+	}
+
+	fn render(&mut self, args: &RenderArgs) {
+		use graphics::*;
+
+		const BLACK: [f32; 4] = [0.0; 4];
+
+		let n = self.board.len() as u32;
+		let def_d = DrawState::default();
+
+		self.gl.draw(args.viewport(), |c, gl| {
+			clear(BLACK, gl);
+		});
+		for i in 0..n {
+			for j in 0..n {
+				let (x, y) = ((j * args.width / n) as f64,
+							  (i * args.height / n) as f64);
+				let val = self.board[i as usize][j as usize];
+				let ref piece = self.imgref[val].0;
+				let ref texture = self.imgref[val].1;
+				self.gl.draw(args.viewport(), |c, gl| {
+					let transform = c.transform.trans(x, y);
+					piece.draw(texture, &def_d, transform, gl)
+				});
+				if self.complete && val == 0 {
+					let ref piece = self.missing.0;
+					let ref texture = self.missing.1;
+					self.gl.draw(args.viewport(), |c, gl| {
+						let transform = c.transform.trans(x, y);
+						piece.draw(texture, &def_d, transform, gl)
+					});
+				}
+			}
+		}
+	}
+
+	fn moveroo(&mut self, args: &Button) {
+		use crate::Direction::*;
+		if self.complete {
+			return ;
+		}
+		let dir = match &args {
+			Button::Keyboard(Key::Right) => Left,
+			Button::Keyboard(Key::Left) => Right,
+			Button::Keyboard(Key::Down) => Up,
+			Button::Keyboard(Key::Up) => Down,
+			_ => return,
+		};
+		match (dir, self.zero.0 > 0, self.zero.0 < self.goal.len() - 1, self.zero.1 > 0, self.zero.1 < self.goal.len() - 1) {
+			(Right, _, _, _, true) => {
+				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0][self.zero.1 + 1];
+				self.board[self.zero.0][self.zero.1 + 1] = 0;
+				self.zero.1 += 1;
+			},
+			(Left, _, _, true, _) => {
+				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0][self.zero.1 - 1];
+				self.board[self.zero.0][self.zero.1 - 1] = 0;
+				self.zero.1 -= 1;
+			},
+			(Down, _, true, _, _) => {
+				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0 + 1][self.zero.1];
+				self.board[self.zero.0 + 1][self.zero.1] = 0;
+				self.zero.0 += 1;
+			},
+			(Up, true, _, _, _) => {
+				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0 - 1][self.zero.1];
+				self.board[self.zero.0 - 1][self.zero.1] = 0;
+				self.zero.0 -= 1;
+			},
+			_ => {},
+		}
+		self.complete = self.board == self.goal;
+	}
+}
+
 pub struct Viz {
 	gl: GlGraphics, // OpenGL drawing backend.
 	step: usize, // Current location in sequence 
@@ -30,11 +162,11 @@ impl Viz {
 
 		let n = goal.len();
 		let width = width as usize;
-		let defT = TextureSettings::new();
+		let def_t = TextureSettings::new();
 		let mut imgref : Vec<(Image, Texture)> = Vec::with_capacity(n * n);
 		for _ in 0..(n * n) {
 			let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
-			let texture = Texture::from_path(Path::new("assets/argyle.png"), &defT).unwrap();
+			let texture = Texture::from_path(Path::new("assets/argyle.png"), &def_t).unwrap();
 			imgref.push((piece, texture));
 		}
 		if n < 8 {
@@ -45,10 +177,10 @@ impl Viz {
 					p.push_str(&(j.to_string()));
 					p.push_str(".png");
 					if goal[i][j] != 0 {
-						imgref[goal[i][j]].1 = Texture::from_path(Path::new(&p), &defT).unwrap();
+						imgref[goal[i][j]].1 = Texture::from_path(Path::new(&p), &def_t).unwrap();
 					}
 					else {
-						imgref[goal[i][j]].1 = Texture::from_path(Path::new("assets/Solid_black.png"), &defT).unwrap();
+						imgref[goal[i][j]].1 = Texture::from_path(Path::new("assets/Solid_black.png"), &def_t).unwrap();
 					}
 				}
 			}
@@ -66,11 +198,10 @@ impl Viz {
 		use graphics::*;
 
 		const BLACK: [f32; 4] = [0.0; 4];
-		const WHITE:   [f32; 4] = [1.0; 4];
 		let mut color: [f32; 4] = [0.0; 4];
 
 		let n = self.board.len() as u32;
-		let defD = DrawState::default();
+		let def_d = DrawState::default();
 
 		self.gl.draw(args.viewport(), |c, gl| {
 			clear(BLACK, gl);
@@ -84,7 +215,7 @@ impl Viz {
 				let ref texture = self.imgref[val].1;
 				self.gl.draw(args.viewport(), |c, gl| {
 					let transform = c.transform.trans(x, y);
-					piece.draw(texture, &defD, transform, gl)
+					piece.draw(texture, &def_d, transform, gl)
 				});
 			}
 		}
@@ -421,7 +552,6 @@ impl Node {
 			self.h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
 			self.h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
 		}
-		let mut base = 0;
 		for i in 0..(len / 2) {
 			for j in i..(len - i - 1) {
 				if (self.board[i][j] != 0 && self.board[i][j] != n - 1) && self.board[i][j] + 1 != self.board[i][j + 1] {
@@ -579,11 +709,41 @@ fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
 	let mut tmp = File::create("puzzles/tmp.txt").unwrap();
 	for row in out.iter() {
 		for e in row.iter() {
-			write!(tmp, "{} ", e);
+			write!(tmp, "{} ", e).expect("Could not write to tmp file");
 		}
-		tmp.write(b"\n");
+		tmp.write(b"\n").expect("Could not write to tmp file");
 	}
 	out
+}
+
+fn let_me_try(mut game: Game, mut window: Window) {
+	let mut events = Events::new(EventSettings::new());
+	let ufps = 8;
+	events.set_max_fps(ufps);
+	events.set_ups(ufps);
+	while let Some(e) = events.next(&mut window) {
+		if let Some(r) = e.render_args() {
+			game.render(&r);
+		}
+		if let Some(p) = e.press_args() {
+			game.moveroo(&p);
+		}
+	}
+}
+
+fn do_it(mut viz: Viz, mut window: Window) {
+	let mut events = Events::new(EventSettings::new());
+	let ufps = 8;
+	events.set_max_fps(ufps);
+	events.set_ups(ufps);
+	while let Some(e) = events.next(&mut window) {
+		if let Some(r) = e.render_args() {
+			viz.render(&r);
+		}
+		if let Some(u) = e.update_args() {
+			viz.update(&u);
+		}
+	}
 }
 
 fn main() {
@@ -611,6 +771,10 @@ fn main() {
 							   .long("auto")
 							   .help("Auto-generates board")
 							   .takes_value(true))
+						  .arg(Arg::with_name("mine")
+							   .short("m")
+							   .long("mine")
+							   .help("Lets you take the wheel"))
 						  .get_matches();
 	let puzzle = if matches.is_present("auto") {
 		puzzle_gen(matches.value_of("auto").unwrap().parse::<usize>().unwrap_or(3))
@@ -633,14 +797,11 @@ fn main() {
 	for row in puzzle.iter() {
 		println!("{:?}", row);
 	}
-	let goal = quest.get_goal();
 	if quest.insoluble() {
 		println!("Unstackable cups!");
 	}
 	else {
-		let steps = solverize(quest);
 		let width = 500;
-
 		let opengl = OpenGL::V3_2;
 		let mut window: Window = WindowSettings::new(
 				"white-square",
@@ -650,18 +811,15 @@ fn main() {
 			.exit_on_esc(true)
 			.build()
 			.unwrap();
-		let mut viz = Viz::new(GlGraphics::new(opengl), steps, puzzle, &goal, width);
-		let mut events = Events::new(EventSettings::new());
-		let ufps = 8;
-		events.set_max_fps(ufps);
-		events.set_ups(ufps);
-		while let Some(e) = events.next(&mut window) {
-			if let Some(r) = e.render_args() {
-				viz.render(&r);
-			}
-			if let Some(u) = e.update_args() {
-				viz.update(&u);
-			}
+		if matches.is_present("mine") {
+			let game = Game::new(GlGraphics::new(opengl), puzzle, quest.get_goal(), width);
+			let_me_try(game, window);
+		}
+		else {
+			let goal = quest.get_goal();
+			let steps = solverize(quest);
+			let viz = Viz::new(GlGraphics::new(opengl), steps, puzzle, &goal, width);
+			do_it(viz, window);
 		}
 	}
 }
