@@ -775,6 +775,11 @@ fn main() {
 							   .short("m")
 							   .long("mine")
 							   .help("Lets you take the wheel"))
+						  .arg(Arg::with_name("quiet")
+							   .short("q")
+							   .long("quiet")
+							   .conflicts_with("mine")
+							   .help("Suppresses visualizer"))
 						  .get_matches();
 	let puzzle = if matches.is_present("auto") {
 		puzzle_gen(matches.value_of("auto").unwrap().parse::<usize>().unwrap_or(3))
@@ -818,8 +823,23 @@ fn main() {
 		else {
 			let goal = quest.get_goal();
 			let steps = solverize(quest);
-			let viz = Viz::new(GlGraphics::new(opengl), steps, puzzle, &goal, width);
-			do_it(viz, window);
+			if matches.is_present("quiet") {
+				for i in 0..(steps.len()) {
+					if i != 0 {
+						match (steps[i].0 as i64 - steps[i - 1].0 as i64, steps[i].1 as i64 - steps[i - 1].1 as i64) {
+							(-1, 0) => println!("Slide down!"),
+							(1, 0) => println!("Slide up!"),
+							(0, -1) => println!("Slide right!"),
+							(0, 1) => println!("Slide left!"),
+							_ => println!("A hop, skip, or jump"),
+						}
+					}
+				}
+			}
+			else {
+				let viz = Viz::new(GlGraphics::new(opengl), steps, puzzle, &goal, width);
+				do_it(viz, window);
+			}
 		}
 	}
 }
