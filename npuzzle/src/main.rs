@@ -764,11 +764,11 @@ fn main() {
 						  .arg(Arg::with_name("mine")
 							   .short("m")
 							   .long("mine")
+							   .conflicts_with_all(&["quiet", "heuristic", "greedy"])
 							   .help("Lets you take the wheel"))
 						  .arg(Arg::with_name("quiet")
 							   .short("q")
 							   .long("quiet")
-							   .conflicts_with("mine")
 							   .help("Suppresses visualizer"))
 						  .get_matches();
 	let puzzle = if matches.is_present("auto") {
