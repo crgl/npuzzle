@@ -651,12 +651,6 @@ fn main() {
 			.build()
 			.unwrap();
 		let mut viz = Viz::new(GlGraphics::new(opengl), steps, puzzle, &goal, width);
-		// let mut viz = Viz {
-		// 	gl: GlGraphics::new(opengl),
-		// 	step: 0,
-		// 	steps,
-		// 	board: puzzle,
-		// };
 		let mut events = Events::new(EventSettings::new());
 		let ufps = 8;
 		events.set_max_fps(ufps);
