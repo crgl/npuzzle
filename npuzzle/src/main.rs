@@ -238,6 +238,7 @@ enum Heuristic
 	Manhattan,
 	OutOfLine,
 	Nilsson,
+	Custom,
 }
 
 #[derive(Copy, Clone)]
@@ -400,6 +401,7 @@ impl Node {
 			Heuristic::Manhattan => out.manhattan(goal, greedy),
 			Heuristic::OutOfLine => out.out_of_line(goal, greedy),
 			Heuristic::Nilsson => out.nilsson(goal, greedy),
+			Heuristic::Custom => out.custom(goal, greedy),
 		}
 		out
 	}
@@ -412,6 +414,7 @@ impl Node {
 			Heuristic::Manhattan => out.manhattan(goal, greedy),
 			Heuristic::OutOfLine => out.out_of_line(goal, greedy),
 			Heuristic::Nilsson => out.nilsson(goal, greedy),
+			Heuristic::Custom => out.custom(goal, greedy),
 		}
 		out
 	}
@@ -561,6 +564,36 @@ impl Node {
 		}
 		if self.board[len / 2][(len - 1) / 2] != 0 {
 			self.h += 3;
+		}
+		if greedy {
+			self.f = -1 * self.h;
+		}
+		else {
+			self.f = -1 * (self.g + self.h);
+		}
+	}
+
+	fn custom(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
+		self.h = 0;
+		let len = goal.len();
+		let n = len * len;
+		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
+		let mut glp = bdp.clone();
+		for i in 0..len {
+			for j in 0..len {
+				bdp[self.board[i][j]] = (i, j);
+				glp[goal[i][j]] = (i, j);
+			}
+		}
+		for i in 0..n {
+			let tmp = (bdp[i].0 as i64 - glp[i].0 as i64).abs() + (bdp[i].1 as i64 - glp[i].1 as i64).abs();
+			// let mut to_add = tmp;
+			// let ring = *[(bdp[i].0 as i64 - len as i64 / 2).abs(), (bdp[i].1 as i64 - len as i64 / 2).abs()].iter().max().unwrap();
+			// for _ in 0..ring {
+			// 	to_add *= tmp;
+			// }
+			let to_add = 10 * tmp;
+			self.h += to_add;
 		}
 		if greedy {
 			self.f = -1 * self.h;
@@ -754,7 +787,7 @@ fn main() {
 							   .long("heuristic")
 							   .help("Sets the heuristic")
 							   .takes_value(true)
-							   .possible_values(&["manhattan", "hamming", "ool", "nilsson"]))
+							   .possible_values(&["manhattan", "hamming", "ool", "nilsson", "custom"]))
 						  .arg(Arg::with_name("auto")
 						  	   .short("a")
 							   .long("auto")
@@ -786,6 +819,7 @@ fn main() {
 		"hamming" => Heuristic::Hamming,
 		"ool" => Heuristic::OutOfLine,
 		"nilsson" => Heuristic::Nilsson,
+		"custom" => Heuristic::Custom,
 		_ => Heuristic::Manhattan,
 	};
 	let quest = refine(puzzle.clone(), heur, greedy);
