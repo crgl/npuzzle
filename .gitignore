@@ -1,0 +1,6 @@
+/target/
+
+Cargo.lock
+
+# Used by auto; changes constantly
+/puzzles/tmp.txt
