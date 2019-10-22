@@ -194,7 +194,11 @@ fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
 		}
 		tmp.write(b"\n").expect("Could not write to tmp file");
 	}
-	out
+	if insoluble(&out, None) {
+		puzzle_gen(len)
+	} else {
+		out
+	}
 }
 
 fn let_me_try(mut game: Game, mut window: Window) {
