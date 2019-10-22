@@ -296,7 +296,7 @@ fn main() {
 		let width = 500;
 		let opengl = OpenGL::V3_2;
 		let window: Window = WindowSettings::new(
-				"white-square",
+				"NPuzzle",
 				[width, width]
 			)
 			.opengl(opengl)
