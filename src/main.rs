@@ -1,8 +1,6 @@
 use std::io::prelude::*;
 use std::fs::File;
 use std::collections::HashSet;
-use std::collections::BinaryHeap;
-use std::cmp::Ordering;
 
 use rand::{thread_rng, Rng};
 
@@ -12,227 +10,19 @@ use piston::window::WindowSettings;
 use piston::event_loop::*;
 use piston::input::*;
 use glutin_window::GlutinWindow as Window;
-use opengl_graphics::{ GlGraphics, OpenGL, Texture };
-use piston_window::TextureSettings;
-use std::path::Path;
+use opengl_graphics::{ GlGraphics, OpenGL };
 
-pub struct Game {
-	gl: GlGraphics,
-	zero: (usize, usize),
-	board: Vec<Vec<usize>>,
-	goal: Vec<Vec<usize>>,
-	imgref: Vec<(graphics::Image, Texture)>,
-	complete: bool,
-	missing: (graphics::Image, Texture),
-}
+mod node;
+mod quest;
+mod game;
+mod viz;
 
-impl Game {
-	fn new(gl: GlGraphics, board: Vec<Vec<usize>>, goal: Vec<Vec<usize>>, width: u32) -> Game {
-		use graphics::*;
-
-		let n = goal.len();
-		let width = width as usize;
-		let def_t = TextureSettings::new();
-		let mut imgref : Vec<(Image, Texture)> = Vec::with_capacity(n * n);
-		for _ in 0..(n * n) {
-			let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
-			let texture = Texture::from_path(Path::new("assets/argyle.png"), &def_t).unwrap();
-			imgref.push((piece, texture));
-		}
-		let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
-		let texture = Texture::from_path(Path::new("assets/argyle.png"), &def_t).unwrap();
-		let mut missing = (piece, texture);
-		let mut zero = (0, 0);
-		if n < 8 {
-			for i in 0..n {
-				for j in 0..n {
-					let mut p = "assets/split-2018-11-14/".to_owned();
-					p.push_str(&(i.to_string()));
-					p.push_str(&(j.to_string()));
-					p.push_str(".png");
-					if goal[i][j] != 0 {
-						imgref[goal[i][j]].1 = Texture::from_path(Path::new(&p), &def_t).unwrap();
-					}
-					else {
-						missing.1 = Texture::from_path(Path::new(&p), &def_t).unwrap();
-						imgref[goal[i][j]].1 = Texture::from_path(Path::new("assets/Solid_black.png"), &def_t).unwrap();
-					}
-					if board[i][j] == 0 {
-						zero = (i, j);
-					}
-				}
-			}
-		}
-		let complete = board == goal;
-		Game {
-			gl,
-			zero,
-			board,
-			goal,
-			imgref,
-			complete,
-			missing,
-		}
-	}
-
-	fn render(&mut self, args: &RenderArgs) {
-		use graphics::*;
-
-		const BLACK: [f32; 4] = [0.0; 4];
-
-		let n = self.board.len() as u32;
-		let def_d = DrawState::default();
-
-		self.gl.draw(args.viewport(), |c, gl| {
-			clear(BLACK, gl);
-		});
-		for i in 0..n {
-			for j in 0..n {
-				let (x, y) = ((j * args.width / n) as f64,
-							  (i * args.height / n) as f64);
-				let val = self.board[i as usize][j as usize];
-				let ref piece = self.imgref[val].0;
-				let ref texture = self.imgref[val].1;
-				self.gl.draw(args.viewport(), |c, gl| {
-					let transform = c.transform.trans(x, y);
-					piece.draw(texture, &def_d, transform, gl)
-				});
-				if self.complete && val == 0 {
-					let ref piece = self.missing.0;
-					let ref texture = self.missing.1;
-					self.gl.draw(args.viewport(), |c, gl| {
-						let transform = c.transform.trans(x, y);
-						piece.draw(texture, &def_d, transform, gl)
-					});
-				}
-			}
-		}
-	}
-
-	fn moveroo(&mut self, args: &Button) {
-		use crate::Direction::*;
-		if self.complete {
-			return ;
-		}
-		let dir = match &args {
-			Button::Keyboard(Key::Right) => Left,
-			Button::Keyboard(Key::Left) => Right,
-			Button::Keyboard(Key::Down) => Up,
-			Button::Keyboard(Key::Up) => Down,
-			_ => return,
-		};
-		match (dir, self.zero.0 > 0, self.zero.0 < self.goal.len() - 1, self.zero.1 > 0, self.zero.1 < self.goal.len() - 1) {
-			(Right, _, _, _, true) => {
-				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0][self.zero.1 + 1];
-				self.board[self.zero.0][self.zero.1 + 1] = 0;
-				self.zero.1 += 1;
-			},
-			(Left, _, _, true, _) => {
-				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0][self.zero.1 - 1];
-				self.board[self.zero.0][self.zero.1 - 1] = 0;
-				self.zero.1 -= 1;
-			},
-			(Down, _, true, _, _) => {
-				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0 + 1][self.zero.1];
-				self.board[self.zero.0 + 1][self.zero.1] = 0;
-				self.zero.0 += 1;
-			},
-			(Up, true, _, _, _) => {
-				self.board[self.zero.0][self.zero.1] = self.board[self.zero.0 - 1][self.zero.1];
-				self.board[self.zero.0 - 1][self.zero.1] = 0;
-				self.zero.0 -= 1;
-			},
-			_ => {},
-		}
-		self.complete = self.board == self.goal;
-	}
-}
-
-pub struct Viz {
-	gl: GlGraphics, // OpenGL drawing backend.
-	step: usize, // Current location in sequence 
-	steps: Vec<(usize, usize)>, // sequence
-	board: Vec<Vec<usize>>, // starting board
-	imgref: Vec<(graphics::Image, Texture)>, // images
-}
-
-impl Viz {
-	fn new(gl: GlGraphics, steps: Vec<(usize, usize)>, board: Vec<Vec<usize>>, goal: &Vec<Vec<usize>>, width: u32) -> Viz {
-		use graphics::*;
-
-		let n = goal.len();
-		let width = width as usize;
-		let def_t = TextureSettings::new();
-		let mut imgref : Vec<(Image, Texture)> = Vec::with_capacity(n * n);
-		for _ in 0..(n * n) {
-			let piece = Image::new().rect(rectangle::square(0.0, 0.0, (width / n) as f64 - 1.));
-			let texture = Texture::from_path(Path::new("assets/argyle.png"), &def_t).unwrap();
-			imgref.push((piece, texture));
-		}
-		if n < 8 {
-			for i in 0..n {
-				for j in 0..n {
-					let mut p = "assets/split-2018-11-14/".to_owned();
-					p.push_str(&(i.to_string()));
-					p.push_str(&(j.to_string()));
-					p.push_str(".png");
-					if goal[i][j] != 0 {
-						imgref[goal[i][j]].1 = Texture::from_path(Path::new(&p), &def_t).unwrap();
-					}
-					else {
-						imgref[goal[i][j]].1 = Texture::from_path(Path::new("assets/Solid_black.png"), &def_t).unwrap();
-					}
-				}
-			}
-		}
-		Viz {
-			gl,
-			step: 0,
-			steps,
-			board,
-			imgref,
-		}
-	}
-
-	fn render(&mut self, args: &RenderArgs) {
-		use graphics::*;
-
-		const BLACK: [f32; 4] = [0.0; 4];
-
-		let n = self.board.len() as u32;
-		let def_d = DrawState::default();
-
-		self.gl.draw(args.viewport(), |c, gl| {
-			clear(BLACK, gl);
-		});
-		for i in 0..n {
-			for j in 0..n {
-				let (x, y) = ((j * args.width / n) as f64,
-							  (i * args.height / n) as f64);
-				let val = self.board[i as usize][j as usize];
-				let ref piece = self.imgref[val].0;
-				let ref texture = self.imgref[val].1;
-				self.gl.draw(args.viewport(), |c, gl| {
-					let transform = c.transform.trans(x, y);
-					piece.draw(texture, &def_d, transform, gl)
-				});
-			}
-		}
-	}
-
-	fn update(&mut self, args: &UpdateArgs) {
-		if self.step < self.steps.len() - 1 {
-			self.step += 1;
-			let (y1, x1) = self.steps[self.step - 1];
-			let (y2, x2) = self.steps[self.step];
-			self.board[y1][x1] = self.board[y2][x2];
-			self.board[y2][x2] = 0;
-		}
-	}
-}
+use crate::quest::Quest;
+use crate::game::Game;
+use crate::viz::Viz;
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
-enum Heuristic
+pub enum Heuristic
 {
 	Hamming,
 	Manhattan,
@@ -242,389 +32,12 @@ enum Heuristic
 }
 
 #[derive(Copy, Clone)]
-enum Direction
+pub(crate) enum Direction
 {
 	Up,
 	Down,
 	Left,
 	Right,
-}
-
-struct Quest {
-	goal: Vec<Vec<usize>>,
-	open: BinaryHeap<Node>,
-	closed: HashSet<Vec<Vec<usize>>>,
-	heur: Heuristic,
-	greedy: bool,
-	max_space: usize,
-}
-
-impl Quest {
-	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: Vec<Vec<usize>>) -> Quest {
-		let mut open = BinaryHeap::new();
-		open.push(Node::new(board, heur, greedy, &goal));
-		Quest {
-			goal,
-			open,
-			closed: HashSet::new(),
-			heur,
-			greedy,
-			max_space: 1,
-		}
-	}
-
-	fn insoluble(&self) -> bool {
-		let board = self.open.peek().unwrap().board_ref();
-		let len = board.len();
-		let n = len * len;
-		let mut inv_board = 0;
-		let mut inv_goal = 0;
-		let mut zero_row_board = 0;
-		let mut zero_row_goal = 0;
-		let mut weights_board : Vec<usize> = std::iter::repeat(0).take(n).collect();
-		let mut weights_goal = weights_board.clone();
-		for i in 0..len {
-			for j in 0..len {
-				inv_board += weights_board[board[i][j]];
-				inv_goal += weights_goal[self.goal[i][j]];
-				if board[i][j] == 0 {
-					zero_row_board = i;
-				}
-				if self.goal[i][j] == 0 {
-					zero_row_goal = i;
-				}
-				for k in 1..board[i][j] {
-					weights_board[k] += 1;
-				}
-				for k in 1..self.goal[i][j] {
-					weights_goal[k] += 1;
-				}
-			}
-		}
-		let check = (inv_board + inv_goal + ((zero_row_board + zero_row_goal) % 2) * ((len + 1) % 2)) % 2;
-		if check == 0 {
-			false
-		}
-		else {
-			true
-		}
-	}
-
-	fn step(& mut self) -> Option<Node> {
-		if self.open.is_empty() {
-			return None;
-		}
-		let to_search = self.open.pop().unwrap();
-		if self.closed.contains(to_search.board_ref()) {
-			return None;
-		}
-		if to_search.dist() == 0 {
-			return Some(to_search);
-		}
-		let &(y, x) = to_search.path.last().unwrap();
-		if x > 0 {
-			let to_push = to_search.shift(Direction::Left, self.heur, self.greedy, &self.goal);
-			if !self.closed.contains(to_push.board_ref()) {
-				self.open.push(to_push);
-			}
-		}
-		if x < self.goal.len() - 1 {
-			let to_push = to_search.shift(Direction::Right, self.heur, self.greedy, &self.goal);
-			if !self.closed.contains(to_push.board_ref()) {
-				self.open.push(to_push);
-			}
-		}
-		if y > 0 {
-			let to_push = to_search.shift(Direction::Up, self.heur, self.greedy, &self.goal);
-			if !self.closed.contains(to_push.board_ref()) {
-				self.open.push(to_push);
-			}
-		}
-		if y < self.goal.len() - 1 {
-			let to_push = to_search.shift(Direction::Down, self.heur, self.greedy, &self.goal);
-			if !self.closed.contains(to_push.board_ref()) {
-				self.open.push(to_push);
-			}
-		}
-		self.closed.insert(to_search.into_board());
-		if self.open.len() > self.max_space {
-			self.max_space = self.open.len();
-		}
-		None
-	}
-
-	fn get_goal(&self) -> Vec<Vec<usize>> {
-		self.goal.clone()
-	}
-
-	fn continues(&self) -> bool {
-		!self.open.is_empty()
-	}
-
-	fn space(&self) -> usize {
-		self.max_space
-	}
-
-	fn time(&self) -> usize {
-		self.closed.len()
-	}
-}
-
-#[derive(Clone, Hash, Eq)]
-struct Node {
-	f: i64,
-	g: i64,
-	h: i64,
-	pub path: Vec<(usize, usize)>,
-	board: Vec<Vec<usize>>,
-}
-
-impl Node {
-	fn new(board: Vec<Vec<usize>>, heur: Heuristic, greedy: bool, goal: &Vec<Vec<usize>>) -> Node {
-		let mut i = 0;
-		let zero = 'outer: loop {
-			for j in 0..(board.len()) {
-				if board[i][j] == 0 {
-					break 'outer (i, j);
-				}
-			}
-			i += 1;
-			if i == board.len() {
-				panic!();
-			}
-		};
-		let mut path = Vec::new();
-		path.push(zero);
-		let mut out = Node { f: 0, g: 0, h: 0, path, board };
-		match heur {
-			Heuristic::Hamming => out.hamming(goal, greedy),
-			Heuristic::Manhattan => out.manhattan(goal, greedy),
-			Heuristic::OutOfLine => out.out_of_line(goal, greedy),
-			Heuristic::Nilsson => out.nilsson(goal, greedy),
-			Heuristic::Custom => out.custom(goal, greedy),
-		}
-		out
-	}
-
-	fn shift(&self, dir: Direction, heur: Heuristic, greedy: bool, goal: &Vec<Vec<usize>>) -> Self {
-		let mut out = self.clone();
-		out.swap(dir);
-		match heur {
-			Heuristic::Hamming => out.hamming(goal, greedy),
-			Heuristic::Manhattan => out.manhattan(goal, greedy),
-			Heuristic::OutOfLine => out.out_of_line(goal, greedy),
-			Heuristic::Nilsson => out.nilsson(goal, greedy),
-			Heuristic::Custom => out.custom(goal, greedy),
-		}
-		out
-	}
-
-	fn swap(& mut self, dir: Direction) {
-		let &curr = self.path.last().unwrap();
-		let next = match dir {
-			Direction::Up => (curr.0 - 1, curr.1),
-			Direction::Down => (curr.0 + 1, curr.1),
-			Direction::Left => (curr.0, curr.1 - 1),
-			Direction::Right => (curr.0, curr.1 + 1),
-		};
-		self.board[curr.0][curr.1] = self.board[next.0][next.1];
-		self.board[next.0][next.1] = 0;
-		self.path.push(next);
-		self.inc();
-	}
-
-	fn inc(& mut self) {
-		self.g += 1;
-	}
-
-	fn dist(&self) -> i64 {
-		self.h
-	}
-
-	fn steps(&self) -> Vec<(usize, usize)> {
-		self.path.clone()
-	}
-
-	fn board_ref(&self) -> &Vec<Vec<usize>> {
-		&self.board
-	}
-
-	fn into_board(self) -> Vec<Vec<usize>> {
-		self.board
-	}
-
-	fn print_board(&self) {
-		for row in self.board.iter() {
-			println!("{:?}", row);
-		}
-	}
-
-	fn hamming(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		self.h = 0;
-		let n = goal.len();
-		for i in 0..n {
-			for j in 0..n {
-				if self.board[i][j] != goal[i][j] {
-					self.h += 1;
-				}
-			}
-		}
-		if greedy {
-			self.f = -1 * self.h;
-		}
-		else {
-			self.f = -1 * (self.g + self.h);
-		}
-	}
-
-	fn manhattan(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		self.h = 0;
-		let len = goal.len();
-		let n = len * len;
-		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
-		let mut glp = bdp.clone();
-		for i in 0..len {
-			for j in 0..len {
-				bdp[self.board[i][j]] = (i, j);
-				glp[goal[i][j]] = (i, j);
-			}
-		}
-		for i in 0..n {
-			self.h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
-			self.h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
-		}
-		if greedy {
-			self.f = -1 * self.h;
-		}
-		else {
-			self.f = -1 * (self.g + self.h);
-		}
-	}
-
-	fn out_of_line(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		self.h = 0;
-		let len = goal.len();
-		let n = len * len;
-		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
-		let mut glp = bdp.clone();
-		for i in 0..len {
-			for j in 0..len {
-				bdp[self.board[i][j]] = (i, j);
-				glp[goal[i][j]] = (i, j);
-			}
-		}
-		for i in 0..n {
-			self.h += match (bdp[i].0 == glp[i].0, bdp[i].1 == glp[i].1) {
-				(true, true) => 0,
-				(true, false) | (false, true) => 1,
-				(false, false) => 2,
-			};
-		}
-		if greedy {
-			self.f = -1 * self.h;
-		}
-		else {
-			self.f = -1 * (self.g + self.h);
-		}
-	}
-
-	fn nilsson(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		self.h = 0;
-		let len = goal.len();
-		let n = len * len;
-		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
-		let mut glp = bdp.clone();
-		for i in 0..len {
-			for j in 0..len {
-				bdp[self.board[i][j]] = (i, j);
-				glp[goal[i][j]] = (i, j);
-			}
-		}
-		for i in 0..n {
-			self.h += (std::cmp::max(bdp[i].0, glp[i].0) - std::cmp::min(bdp[i].0, glp[i].0)) as i64;
-			self.h += (std::cmp::max(bdp[i].1, glp[i].1) - std::cmp::min(bdp[i].1, glp[i].1)) as i64;
-		}
-		for i in 0..(len / 2) {
-			for j in i..(len - i - 1) {
-				if (self.board[i][j] != 0 && self.board[i][j] != n - 1) && self.board[i][j] + 1 != self.board[i][j + 1] {
-					self.h += 6;
-				}
-				if (self.board[j][len - i - 1] != 0 && self.board[j][len - i - 1] != n - 1) && self.board[j][len - i - 1] + 1 != self.board[j + 1][len - i - 1] {
-					self.h += 6;
-				}
-				if (self.board[len - i - 1][len - j - 1] != 0 && self.board[len - i - 1][len - j - 1] != n - 1) && self.board[len - i - 1][len - j - 1] + 1 != self.board[len - i - 1][len - j - 2] {
-					self.h += 6;
-				}
-				if (self.board[len - j - 1][i] != 0 && self.board[len - j - 1][i] != n - 1) && self.board[len - j - 1][i] + 1 != self.board[len - j - 2][i] {
-					if i == (len - 1) / 2 {
-						self.h += 6;
-					}
-				}
-			}
-		}
-		if self.board[len / 2][(len - 1) / 2] != 0 {
-			self.h += 3;
-		}
-		if greedy {
-			self.f = -1 * self.h;
-		}
-		else {
-			self.f = -1 * (self.g + self.h);
-		}
-	}
-
-	fn custom(& mut self, goal: &Vec<Vec<usize>>, greedy: bool) {
-		self.h = 0;
-		let len = goal.len();
-		let n = len * len;
-		let mut bdp : Vec<(usize, usize)> = std::iter::repeat((0, 0)).take(n).collect();
-		let mut glp = bdp.clone();
-		for i in 0..len {
-			for j in 0..len {
-				bdp[self.board[i][j]] = (i, j);
-				glp[goal[i][j]] = (i, j);
-			}
-		}
-		for i in 0..n {
-			let tmp = (bdp[i].0 as i64 - glp[i].0 as i64).abs() + (bdp[i].1 as i64 - glp[i].1 as i64).abs();
-			// let mut to_add = tmp;
-			// let ring = *[(bdp[i].0 as i64 - len as i64 / 2).abs(), (bdp[i].1 as i64 - len as i64 / 2).abs()].iter().max().unwrap();
-			// for _ in 0..ring {
-			// 	to_add *= tmp;
-			// }
-			let to_add = 10 * tmp;
-			self.h += to_add;
-		}
-		if greedy {
-			self.f = -1 * self.h;
-		}
-		else {
-			self.f = -1 * (self.g + self.h);
-		}
-	}
-}
-
-impl Ord for Node {
-	fn cmp(&self, other: &Node) -> Ordering {
-		match self.f.cmp(&other.f) {
-			Ordering::Less => Ordering::Less,
-			Ordering::Equal => self.g.cmp(&other.g),
-			Ordering::Greater => Ordering::Greater,
-		}
-	}
-}
-
-impl PartialOrd for Node {
-	fn partial_cmp(&self, other: &Node) -> Option<Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-// ???? Maybe just make it normal
-impl PartialEq for Node {
-	fn eq(&self, other: &Node) -> bool {
-		self.f == other.f && self.g == other.g
-	}
 }
 
 fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
@@ -672,8 +85,7 @@ fn parse_input(contents : String) -> Result<Vec<Vec<usize>>, &'static str> {
 	Ok(out)
 }
 
-fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
-	let n = puzzle.len();
+fn construct_basic_goal(n: usize) -> Vec<Vec<usize>> {
 	let mut goal = Vec::new();
 	for _ in 0..n {
 		let mut row = Vec::new();
@@ -695,6 +107,12 @@ fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
 		base += (n - 2 * i - 1) * 4;
 	}
 	goal[n / 2][(n - 1) / 2] = 0;
+	goal
+}
+
+fn refine(puzzle: Vec<Vec<usize>>, heur: Heuristic, greedy: bool) -> Quest {
+	let n = puzzle.len();
+	let goal = construct_basic_goal(n);
 	Quest::new(puzzle, heur, greedy, goal)
 }
 
@@ -712,6 +130,47 @@ fn solverize(mut quest: Quest) -> Vec<(usize, usize)> {
 	}
 	println!("Unstackable cups!");
 	return Vec::new();
+}
+
+fn insoluble(board: &Vec<Vec<usize>>, goal: Option<Vec<Vec<usize>>>) -> bool {
+	let len = board.len();
+	let n = len * len;
+	let mut inv_board = 0;
+	let mut inv_goal = 0;
+	let mut zero_row_board = 0;
+	let mut zero_row_goal = 0;
+	let mut weights_board : Vec<usize> = std::iter::repeat(0).take(n).collect();
+	let mut weights_goal = weights_board.clone();
+	let goal = if let Some(goal) = goal {
+		goal
+	} else {
+		construct_basic_goal(len)
+	};
+	for i in 0..len {
+		for j in 0..len {
+			inv_board += weights_board[board[i][j]];
+			inv_goal += weights_goal[goal[i][j]];
+			if board[i][j] == 0 {
+				zero_row_board = i;
+			}
+			if goal[i][j] == 0 {
+				zero_row_goal = i;
+			}
+			for k in 1..board[i][j] {
+				weights_board[k] += 1;
+			}
+			for k in 1..goal[i][j] {
+				weights_goal[k] += 1;
+			}
+		}
+	}
+	let check = (inv_board + inv_goal + ((zero_row_board + zero_row_goal) % 2) * ((len + 1) % 2)) % 2;
+	if check == 0 {
+		false
+	}
+	else {
+		true
+	}
 }
 
 fn puzzle_gen(len: usize) -> Vec<Vec<usize>> {
